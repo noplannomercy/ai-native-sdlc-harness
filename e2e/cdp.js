@@ -6,6 +6,9 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 
 const CHROME_SUFFIX = path.join('Google', 'Chrome', 'Application', 'chrome.exe');
+const CDP_TIMEOUT = 10000;
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // CHROME_PATH → Windows 기본 설치 경로 순서로 찾는다
 export function findChrome() {
@@ -31,17 +34,37 @@ function waitForDevToolsUrl(proc, timeout = 15000) {
     proc.stderr.setEncoding('utf8');
     proc.stderr.on('data', (chunk) => {
       buf += chunk;
-      const m = buf.match(/DevTools listening on (ws:\/\/\S+)/);
+      // 청크가 URL 중간에서 잘릴 수 있으므로 줄 끝까지 받은 뒤 사용한다
+      const m = buf.match(/DevTools listening on (ws:\/\/\S+)\r?\n/);
       if (m) {
         clearTimeout(timer);
         resolve(m[1]);
       }
+    });
+    proc.once('error', (e) => {
+      clearTimeout(timer);
+      reject(new Error(`Chrome을 실행하지 못했습니다: ${e.message}`));
     });
     proc.once('exit', (code) => {
       clearTimeout(timer);
       reject(new Error(`Chrome이 시작 중 종료되었습니다 (code ${code}):\n${buf}`));
     });
   });
+}
+
+// --headless=new는 DevTools 주소 출력 직후 page 타깃이 아직 없을 수 있다
+async function pageTarget(port) {
+  const origin = `http://127.0.0.1:${port}`;
+  const end = Date.now() + 5000;
+  while (Date.now() < end) {
+    const targets = await (await fetch(`${origin}/json/list`)).json();
+    const page = targets.find((t) => t.type === 'page');
+    if (page) return page;
+    await sleep(100);
+  }
+  const res = await fetch(`${origin}/json/new?about:blank`, { method: 'PUT' });
+  if (!res.ok) throw new Error(`Chrome page 타깃을 만들지 못했습니다 (${res.status})`);
+  return res.json();
 }
 
 export async function launchChrome() {
@@ -60,11 +83,15 @@ export async function launchChrome() {
     ],
     { stdio: ['ignore', 'ignore', 'pipe'] },
   );
-  const exited = new Promise((r) => proc.once('exit', r));
+  // spawn 실패 시에는 'exit' 없이 'error'만 온다
+  const exited = new Promise((r) => {
+    proc.once('exit', r);
+    proc.once('error', r);
+  });
 
   // 연결 전에 실패해도 Chrome과 임시 폴더를 남기지 않는다
   async function kill() {
-    if (proc.exitCode === null && proc.signalCode === null) {
+    if (proc.pid && proc.exitCode === null && proc.signalCode === null) {
       if (process.platform === 'win32') spawnSync('taskkill', ['/PID', String(proc.pid), '/T', '/F'], { stdio: 'ignore' });
       else proc.kill();
       await exited;
@@ -74,10 +101,7 @@ export async function launchChrome() {
 
   try {
     const { port } = new URL(await waitForDevToolsUrl(proc));
-    const targets = await (await fetch(`http://127.0.0.1:${port}/json/list`)).json();
-    const page = targets.find((t) => t.type === 'page');
-    if (!page) throw new Error('Chrome page 타깃이 없습니다');
-    const client = await connect(page.webSocketDebuggerUrl);
+    const client = await connect((await pageTarget(port)).webSocketDebuggerUrl);
     await client.send('Page.enable');
     await client.send('Runtime.enable');
     return createPage(client, async () => {
@@ -85,7 +109,10 @@ export async function launchChrome() {
       await kill();
     });
   } catch (e) {
-    await kill();
+    // 정리 실패가 원래 기동 실패 원인을 가리지 않게 한다
+    await kill().catch((err) => {
+      e.message += `\n(정리 실패: ${err.message})`;
+    });
     throw e;
   }
 }
@@ -95,7 +122,7 @@ function connect(url) {
     const ws = new WebSocket(url);
     let nextId = 1;
     const pending = new Map();
-    const listeners = new Map();
+    const waiters = new Set();
 
     ws.addEventListener('message', (ev) => {
       const msg = JSON.parse(ev.data);
@@ -105,31 +132,41 @@ function connect(url) {
         if (msg.error) p?.reject(new Error(`${msg.error.message} (${p.method})`));
         else p?.resolve(msg.result);
       } else {
-        for (const fn of listeners.get(msg.method) ?? []) fn(msg.params);
+        for (const w of [...waiters]) if (w.method === msg.method) w.resolve(msg.params);
       }
     });
     ws.addEventListener('close', () => {
-      for (const p of pending.values()) p.reject(new Error('CDP 연결이 닫혔습니다'));
-      pending.clear();
+      const err = new Error('CDP 연결이 닫혔습니다');
+      for (const p of pending.values()) p.reject(err);
+      for (const w of [...waiters]) w.reject(err);
     });
     ws.addEventListener('error', () => reject(new Error(`CDP 연결 실패: ${url}`)), { once: true });
+
+    // 응답·이벤트 대기는 모두 시간 제한을 둔다
+    function track(map, key, label, extra = {}) {
+      return new Promise((res, rej) => {
+        const timer = setTimeout(() => entry.reject(new Error(`CDP ${label} 시간 초과 (${CDP_TIMEOUT}ms)`)), CDP_TIMEOUT);
+        const done = (fn) => (v) => {
+          clearTimeout(timer);
+          map.delete(key ?? entry);
+          fn(v);
+        };
+        const entry = { ...extra, resolve: done(res), reject: done(rej) };
+        if (key === undefined) map.add(entry);
+        else map.set(key, entry);
+      });
+    }
+
     ws.addEventListener('open', () =>
       resolve({
         send(method, params = {}) {
           const id = nextId++;
+          const result = track(pending, id, method, { method });
           ws.send(JSON.stringify({ id, method, params }));
-          return new Promise((res, rej) => pending.set(id, { resolve: res, reject: rej, method }));
+          return result;
         },
         once(method) {
-          return new Promise((res) => {
-            const set = listeners.get(method) ?? new Set();
-            const fn = (params) => {
-              set.delete(fn);
-              res(params);
-            };
-            set.add(fn);
-            listeners.set(method, set);
-          });
+          return track(waiters, undefined, `이벤트 ${method}`, { method });
         },
         close() {
           ws.close();
@@ -142,6 +179,7 @@ function connect(url) {
 const KEYS = {
   Enter: { code: 'Enter', windowsVirtualKeyCode: 13, text: '\r' },
   Escape: { code: 'Escape', windowsVirtualKeyCode: 27 },
+  Backspace: { code: 'Backspace', windowsVirtualKeyCode: 8 },
 };
 
 function createPage(client, close) {
@@ -184,7 +222,7 @@ function createPage(client, close) {
       while (Date.now() < end) {
         last = await evaluate(expr);
         if (last) return last;
-        await new Promise((r) => setTimeout(r, 50));
+        await sleep(50);
       }
       throw new Error(`waitFor 시간 초과 (${timeout}ms): ${expr}\n마지막 값: ${JSON.stringify(last)}`);
     },

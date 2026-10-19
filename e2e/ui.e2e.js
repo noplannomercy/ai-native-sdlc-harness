@@ -32,10 +32,14 @@ before(async () => {
   await page.waitFor(`document.querySelector('#list .empty')`);
 });
 
+// 정리 단계는 하나가 실패해도 나머지를 계속한다
 after(async () => {
-  await page?.close();
-  if (server) await new Promise((r) => server.close(r));
+  const results = await Promise.allSettled([
+    page?.close(),
+    server && new Promise((r) => server.close(r)),
+  ]);
   if (dataDir) await rm(dataDir, { recursive: true, force: true });
+  for (const r of results) if (r.status === 'rejected') throw r.reason;
 });
 
 const api = async () => (await fetch(base + '/api/todos')).json();
@@ -67,6 +71,15 @@ const setDate = (selector, value) =>
     el.value = ${JSON.stringify(value)};
     el.dispatchEvent(new Event('change', { bubbles: true }));
   })()`);
+
+// 목록 항목의 날짜는 값이 즉시 바뀌므로, 재렌더로 행이 교체될 때까지 기다린다
+async function setRowDate(n, value) {
+  await page.evaluate(`document.querySelectorAll('#list li').forEach((li) => (li.dataset.stale = '1'))`);
+  await setDate(`${row(n)} .due`, value);
+  await page.waitFor(`document.querySelector('#list li') && !document.querySelector('#list li[data-stale]')`);
+}
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const pressedFilter = () => page.evaluate(`document.querySelector('[aria-pressed=true]').dataset.filter`);
 
@@ -156,13 +169,16 @@ test('R11: 더블클릭 수정 — Esc 취소', async () => {
 });
 
 test('R11: 마감일 변경·해제', async () => {
-  await setDate(`${row(2)} .due`, LATER);
-  let r = await waitRows(`r[1].due === ${JSON.stringify(LATER)} && !r[1].overdue`);
-  assert.equal(r[1].color === RED, false);
+  await setRowDate(2, LATER);
+  let r = await rows();
+  assert.equal(r[1].due, LATER);
+  assert.equal(r[1].overdue, false);
+  assert.notEqual(r[1].color, RED);
   assert.equal((await api())[1].dueDate, LATER);
 
-  await setDate(`${row(3)} .due`, '');
-  r = await waitRows(`r[2].due === ''`);
+  await setRowDate(3, '');
+  r = await rows();
+  assert.equal(r[2].due, '');
   assert.equal((await api())[2].dueDate, null);
 });
 
@@ -189,6 +205,30 @@ test('R12: 새로고침 시 필터는 전체로 초기화, 항목은 유지', as
   const r = await waitRows(`r.length === 3`);
   assert.equal(await pressedFilter(), 'all');
   assert.deepEqual(r.map((x) => x.title), ['우유 사기', '보고서 제출', '저녁 운동 30분']);
+});
+
+test('R11: 제목 검증(R3) — 빈 제목은 추가·수정되지 않음', async () => {
+  const before = await api();
+  assert.equal(await page.evaluate(`document.querySelector('#new input[name=title]').maxLength`), 200);
+
+  // 공백만 입력하면 요청을 보내지 않는다. 일어나지 않는 일을 확인하므로 잠시 기다린 뒤 본다
+  await page.click('#new input[name=title]');
+  await page.type('   ');
+  await page.press('Enter');
+  await sleep(300);
+  assert.equal((await rows()).length, 3);
+  assert.deepEqual(await api(), before);
+
+  // 수정에서 제목을 지우고 Enter → 서버가 400, 에러 표시, 원래 제목 유지
+  await page.click(`${row(1)} .title`, { clickCount: 2 });
+  await waitRows(`r[0].editing`);
+  await page.press('Backspace');
+  await page.press('Enter');
+  const error = await page.waitFor(`document.getElementById('error').textContent`);
+  assert.match(error, /title/);
+  const r = await waitRows(`!r[0].editing`);
+  assert.equal(r[0].title, '우유 사기');
+  assert.deepEqual(await api(), before);
 });
 
 test('R11: 삭제', async () => {
