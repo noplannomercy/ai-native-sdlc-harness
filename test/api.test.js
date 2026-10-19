@@ -116,6 +116,7 @@ test('R7: 삭제 → 204, 이후 GET에 없음', async () => {
 test('R8: 없는 id는 404', async () => {
   assert.equal((await api('PATCH', '/api/todos/nope', { done: true })).status, 404);
   assert.equal((await api('DELETE', '/api/todos/nope')).status, 404);
+  assert.equal((await api('DELETE', '/api/todos/%E0%A4%A')).status, 404);
 });
 
 test('잘못된 JSON 본문은 400', async () => {

@@ -90,7 +90,12 @@ export function createServer({ dataFile, publicDir = path.join(ROOT, 'public') }
 
       const m = pathname.match(/^\/api\/todos\/([^/]+)$/);
       if (m) {
-        const id = decodeURIComponent(m[1]);
+        let id;
+        try {
+          id = decodeURIComponent(m[1]);
+        } catch {
+          throw new HttpError(404, 'todo not found');
+        }
         if (req.method === 'PATCH') {
           const todo = await store.update(id, await readJson(req));
           if (!todo) throw new HttpError(404, 'todo not found');

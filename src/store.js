@@ -30,73 +30,95 @@ function validDueDate(v) {
 
 export function createStore(file) {
   let todos = null;
+  let loading = null;
   let queue = Promise.resolve();
 
-  async function load() {
-    if (todos) return todos;
-    try {
-      todos = JSON.parse(await readFile(file, 'utf8'));
-    } catch (e) {
-      if (e.code !== 'ENOENT') throw e;
-      todos = [];
-    }
-    return todos;
+  // 동시 첫 요청이 각자 파일을 읽어 덮어쓰지 않도록 로드 Promise를 공유한다
+  function load() {
+    loading ??= readFile(file, 'utf8').then(
+      (s) => (todos = JSON.parse(s)),
+      (e) => {
+        if (e.code !== 'ENOENT') {
+          loading = null;
+          throw e;
+        }
+        return (todos = []);
+      },
+    );
+    return loading;
   }
 
-  // 쓰기는 직렬화하고, 임시 파일에 쓴 뒤 rename으로 교체한다
-  function save() {
-    const data = JSON.stringify(todos, null, 2);
-    queue = queue.then(async () => {
-      await mkdir(path.dirname(file), { recursive: true });
-      const tmp = `${file}.tmp`;
-      await writeFile(tmp, data);
-      await rename(tmp, file);
+  async function write(list) {
+    await mkdir(path.dirname(file), { recursive: true });
+    const tmp = `${file}.tmp`;
+    await writeFile(tmp, JSON.stringify(list, null, 2));
+    await rename(tmp, file);
+  }
+
+  // 변경은 직렬화하고, 복사본을 파일에 쓴 뒤에만 메모리에 반영한다.
+  // 한 번 실패해도 다음 변경은 계속 진행된다.
+  function mutate(fn) {
+    const run = queue.then(async () => {
+      await load();
+      const next = todos.map((t) => ({ ...t }));
+      const result = fn(next);
+      if (result === undefined) return undefined;
+      await write(next);
+      todos = next;
+      return result;
     });
-    return queue;
+    queue = run.catch(() => {});
+    return run;
   }
 
   return {
     async list() {
-      return [...(await load())];
+      await queue;
+      await load();
+      return todos.map((t) => ({ ...t }));
     },
 
-    async create(input = {}) {
-      const todo = {
-        id: randomUUID(),
-        title: validTitle(input.title),
-        done: false,
-        dueDate: validDueDate(input.dueDate),
-        createdAt: new Date().toISOString(),
-      };
-      (await load()).push(todo);
-      await save();
-      return todo;
+    create(input = {}) {
+      return mutate((list) => {
+        const todo = {
+          id: randomUUID(),
+          title: validTitle(input.title),
+          done: false,
+          dueDate: validDueDate(input.dueDate),
+          createdAt: new Date().toISOString(),
+        };
+        list.push(todo);
+        return { ...todo };
+      });
     },
 
     // 없는 id면 null
     async update(id, patch = {}) {
-      const todo = (await load()).find((t) => t.id === id);
-      if (!todo) return null;
-      const next = {};
-      if ('title' in patch) next.title = validTitle(patch.title);
-      if ('done' in patch) {
-        if (typeof patch.done !== 'boolean') throw new ValidationError('done must be a boolean');
-        next.done = patch.done;
-      }
-      if ('dueDate' in patch) next.dueDate = validDueDate(patch.dueDate);
-      Object.assign(todo, next);
-      await save();
-      return todo;
+      const result = await mutate((list) => {
+        const todo = list.find((t) => t.id === id);
+        if (!todo) return undefined;
+        const next = {};
+        if ('title' in patch) next.title = validTitle(patch.title);
+        if ('done' in patch) {
+          if (typeof patch.done !== 'boolean') throw new ValidationError('done must be a boolean');
+          next.done = patch.done;
+        }
+        if ('dueDate' in patch) next.dueDate = validDueDate(patch.dueDate);
+        Object.assign(todo, next);
+        return { ...todo };
+      });
+      return result ?? null;
     },
 
     // 삭제했으면 true
     async remove(id) {
-      const list = await load();
-      const i = list.findIndex((t) => t.id === id);
-      if (i < 0) return false;
-      list.splice(i, 1);
-      await save();
-      return true;
+      const result = await mutate((list) => {
+        const i = list.findIndex((t) => t.id === id);
+        if (i < 0) return undefined;
+        list.splice(i, 1);
+        return true;
+      });
+      return result ?? false;
     },
   };
 }
