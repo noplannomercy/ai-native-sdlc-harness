@@ -24,9 +24,9 @@ spec: specs/todo-app.md
 ## 작업 순서
 1. `feat/todo-app` 브랜치 생성 (`git switch -c`), 이 계획을 `plans/todo-app.md`로 커밋 (`plan: todo-app`)
 2. `.gitignore` + `src/store.js` + `test/store.test.js` → `npm test` 통과 후 커밋
-3. `src/server.js` + `test/api.test.js` → 통과 후 커밋
+3. `src/server.js` + `test/api.test.js` + `public/index.html` → 통과 후 커밋 (R10의 `GET /` 테스트가 index.html을 필요로 해서 5단계에서 앞당김)
 4. `public/overdue.js` + `test/overdue.test.js` → 커밋
-5. `public/index.html` + `public/app.js` → 커밋
+5. `public/app.js` → 커밋
 6. `npm test`, `npm run check`, `npm start` + `curl -s localhost:3000/api/todos` 확인
 7. `reviewer` 에이전트로 diff 리뷰 → Important 해결
 8. `verifier` 에이전트로 증명 항목 검증 → 결과 그대로 보고 (main 머지는 사용자 결정)
