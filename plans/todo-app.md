@@ -36,6 +36,7 @@ spec: specs/todo-app.md
 ## 리스크
 - Windows에서 `fs.rename`이 대상 파일 존재 시 드물게 EPERM — 발생하면 재시도 로직 추가 (계획 갱신 후)
 - 동시 요청 시 쓰기 경합: 단일 사용자 전제, 저장소 내부 쓰기를 Promise 체인으로 직렬화해 완화
+  - (리뷰 반영) 로드 Promise 공유, 변경은 복사본에 적용→파일 쓰기 성공 후 메모리 반영, 실패해도 큐는 계속 진행. 잘못 인코딩된 id는 404
 - 직접 실행 감지(`import.meta.url` vs `process.argv[1]`) Windows 경로 차이 → `pathToFileURL(process.argv[1]).href`로 비교
 - R11·R12(화면)는 자동 테스트 없음 → 수동 확인 항목으로 남김
 
