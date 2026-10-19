@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>할 일</title>
+  <style>
+    :root { font-family: system-ui, sans-serif; color: #222; background: #f6f6f4; }
+    body { max-width: 36rem; margin: 2rem auto; padding: 0 1rem; }
+    h1 { font-size: 1.6rem; margin: 0 0 1rem; }
+    form { display: flex; gap: .5rem; flex-wrap: wrap; }
+    form input[name=title] { flex: 1 1 12rem; }
+    input, button { font: inherit; padding: .4rem .6rem; border: 1px solid #ccc; border-radius: 6px; background: #fff; }
+    button { cursor: pointer; }
+    .filters { display: flex; gap: .4rem; margin: 1rem 0 .5rem; }
+    .filters button[aria-pressed=true] { background: #222; color: #fff; border-color: #222; }
+    ul { list-style: none; padding: 0; margin: 0; }
+    li { display: flex; align-items: center; gap: .6rem; padding: .55rem .4rem; border-bottom: 1px solid #e3e3e0; }
+    li .title { flex: 1; word-break: break-word; cursor: text; }
+    li .title input { width: 100%; box-sizing: border-box; }
+    li .due { font-size: .85rem; color: #666; }
+    li.done .title { text-decoration: line-through; color: #999; }
+    li.overdue .title, li.overdue .due { color: #c62828; font-weight: 600; }
+    li .delete { border: none; background: none; color: #999; font-size: 1.1rem; }
+    li .delete:hover { color: #c62828; }
+    .empty { color: #888; padding: 1rem .4rem; }
+    .error { color: #c62828; min-height: 1.2em; margin-top: .5rem; }
+  </style>
+</head>
+<body>
+  <h1>할 일</h1>
+  <form id="new">
+    <input name="title" placeholder="할 일을 입력하세요" maxlength="200" required autocomplete="off">
+    <input name="dueDate" type="date" aria-label="마감일">
+    <button>추가</button>
+  </form>
+  <div class="error" id="error" role="alert"></div>
+  <div class="filters" role="group" aria-label="필터">
+    <button data-filter="all" aria-pressed="true">전체</button>
+    <button data-filter="active" aria-pressed="false">진행</button>
+    <button data-filter="done" aria-pressed="false">완료</button>
+  </div>
+  <ul id="list"></ul>
+  <script type="module" src="app.js"></script>
+</body>
+</html>
