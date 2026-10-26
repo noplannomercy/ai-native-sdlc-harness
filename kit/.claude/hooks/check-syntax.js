@@ -4,7 +4,7 @@ import { readInput, block } from './lib.js';
 
 const { tool_input: ti = {} } = await readInput();
 const file = ti.file_path;
-if (!file || !/\.(m?js)$/.test(file)) process.exit(0);
+if (!file || !/\.[cm]?js$/.test(file)) process.exit(0);
 
 try {
   execFileSync(process.execPath, ['--check', file], { stdio: ['ignore', 'ignore', 'pipe'], encoding: 'utf8' });

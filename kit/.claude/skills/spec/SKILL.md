@@ -7,7 +7,7 @@ description: 승인된 intent/<slug>.md를 specs/<slug>.md(요구사항+설계)�
 
 입력: `status: accepted`인 `intent/<slug>.md`. 승인되지 않았으면 멈추고 알린다.
 
-1. intent와 현재 코드(`src/`, `public/`, `test/`)를 읽는다.
+1. intent와 관련된 현재 코드·테스트를 읽는다.
 2. `templates/spec.md` 양식으로 작성한다.
    - 요구사항마다 **테스트로 확인 가능한** 수용 기준을 붙인다.
    - intent의 열린 질문, 기존 코드와의 충돌, CLAUDE.md 제약과의 충돌은 "우려 사항"에 체크박스로 남긴다. 스스로 결정하지 않는다.

@@ -1,4 +1,5 @@
 import { execFileSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import path from 'node:path';
 
 export async function readInput() {
@@ -26,4 +27,13 @@ export function git(...args) {
 export function block(msg) {
   process.stderr.write(msg + '\n');
   process.exit(2);
+}
+
+// 프로젝트별 설정 (.claude/harness.json). 없거나 깨졌으면 빈 객체.
+export function config() {
+  try {
+    return JSON.parse(readFileSync(path.join(projectDir(), '.claude', 'harness.json'), 'utf8'));
+  } catch {
+    return {};
+  }
 }

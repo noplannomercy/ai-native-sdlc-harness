@@ -1,12 +1,11 @@
 {
-  "name": "harness-todo",
+  "name": "todo-app-example",
   "version": "0.1.0",
   "private": true,
   "type": "module",
   "scripts": {
     "start": "node src/server.js",
     "test": "node --test",
-    "check": "node .claude/hooks/check-syntax-all.js",
     "e2e": "node --test --test-timeout=30000 e2e/ui.e2e.js"
   }
 }

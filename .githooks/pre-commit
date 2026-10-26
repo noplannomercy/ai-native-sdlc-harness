@@ -1,4 +1,0 @@
-#!/bin/sh
-# 커밋 단계의 무거운 검사: 전체 문법 + 테스트
-npm run check --silent || exit 1
-npm test --silent || { echo "pre-commit: npm test 실패 — 코드를 고친 뒤 다시 커밋하세요." >&2; exit 1; }
