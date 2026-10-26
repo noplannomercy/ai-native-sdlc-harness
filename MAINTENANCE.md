@@ -21,7 +21,7 @@
 | `.claude/hooks/check-syntax-all.js` | git이 아는 모든 `.js/.mjs/.cjs` 문법 검사 (pre-commit·verifier가 호출) | — |
 | `.claude/hooks/lib.js` | 훅 공통 함수, `harness.json` 읽기 | — |
 | `.claude/harness.json` | 프로젝트별 `baseBranch`·`testCommand`·`smoke`. 설치 스크립트가 만든다 (kit에 없음) | 보호 경로 |
-| `.githooks/pre-commit` | 문법 검사 + `testCommand`. 비어 있으면 커밋 차단 | git 훅 |
+| `.githooks/pre-commit` | `fix/` 브랜치에서 커밋된 테스트 수정·삭제 차단(셸 경로 포함) + 문법 검사 + `testCommand`. 비어 있으면 커밋 차단 | git 훅 |
 | `.githooks/.gitattributes` | pre-commit을 LF로 고정 (CRLF면 `sh`가 실패) | — |
 | `templates/` | intent·spec·plan 양식 | — |
 
@@ -45,6 +45,7 @@
 | 3차 | + `spec-reviewer` + 커밋 규칙 수정 | `spec-reviewer`가 spec 단계에서 구멍을 실제 값 사례로 찾아 사람에게 올림 → 코드·테스트로 차단. 1차의 남은 결함 4개 모두 해소 |
 
 - `spec-reviewer`는 1차·2차에서 같은 실패(spec 구멍이 검토를 통과)가 두 번 나와 추가했습니다.
+- 배포 시험(새 앱, 깨끗한 설치)에서는 spec-reviewer가 수용 기준의 계산 오류(잠기면 되돌릴 수 없는 테스트)와 음수 쿠폰 경로를 잡았습니다. AI가 혼자 "승인 간주"로 체크한 결정도 다시 사람에게 올렸습니다. 같은 시험에서 셸로 기존 테스트를 고치는 경로가 훅을 통과해 pre-commit 잠금을 넣었습니다(문서에 있던 규칙의 구현 누락).
 - "테스트와 수정을 한 커밋에" 규칙은 "실패 테스트 먼저 커밋"과 pre-commit이 두 번 충돌해서 바꿨습니다.
 
 ## 자주 하는 관리 작업
@@ -92,6 +93,7 @@ v1에는 자동 업그레이드가 없습니다. 설치 스크립트는 내용�
 | pre-commit이 `\r` 관련 오류로 실패 | `.githooks/pre-commit`이 CRLF가 됨. `.githooks/.gitattributes`가 있는지 보고 `git add --renormalize .githooks` |
 | `fix/` 브랜치인데 테스트 편집이 막히지 않는다 | 그 브랜치에 아직 커밋이 없으면 의도대로 허용됩니다. `harness.json`의 `baseBranch`가 실제 기준 브랜치와 같은지 확인 |
 | verifier가 계속 "검증 불가" | `harness.json`에 빈 값이 있음. 서버가 없는 프로젝트면 `"smoke": false` |
+| Claude 실행 중 창을 만지면 창이 꺼진다 (Windows 10 1809·Server 2019 계열) | 오래된 기본 콘솔(conhost) 문제. VS Code 터미널이나 Windows Terminal에서 실행. 꺼졌으면 같은 폴더에서 `claude --continue` |
 | 전역 Claude 설정(플러그인·전역 CLAUDE.md) 때문에 동작이 다르다 | `tools/clean-session.cmd`를 프로젝트에 복사해 실행하면 `%USERPROFILE%\.claude-clean`을 설정 폴더로 써서 하네스만으로 돌려 볼 수 있습니다 (처음 한 번 로그인 필요) |
 
 ## 알려진 한계 (v1.0)
@@ -99,7 +101,9 @@ v1에는 자동 업그레이드가 없습니다. 설치 스크립트는 내용�
 - **모델 의존 단계는 건너뛸 수 있습니다.** 스킬 호출, `spec-reviewer`, `verifier`는 AI가 CLAUDE.md를 따를 때만 동작합니다. 완료 보고 전에 verifier를 강제하는 훅은 없습니다.
 - **열린 결정이 남은 채 머지되는 것은 막지 않습니다.** 완료 보고의 "확인이 필요한 사항"은 사람이 읽어야 합니다.
 - **`grilling`의 추천안은 위험할 수 있습니다.** 시험에서 두 번 연속 구멍이 있는 추천안을 냈습니다. `spec-reviewer`가 뒤에서 잡지만, 사람이 일괄 수락하지 않는 것이 먼저입니다 (USER_GUIDE 2단계).
-- **셸 명령을 통한 보호 파일 수정 차단은 패턴 검사입니다.** `node -e`로 파일을 쓰는 식의 우회는 막지 못합니다. Edit·Write 도구 경로는 확실히 막습니다.
+- **셸 명령을 통한 보호 파일 수정 차단은 패턴 검사입니다.** `node -e`로 파일을 쓰는 식의 우회는 막지 못합니다(Edit·Write 도구 경로는 확실히 막습니다). 반대로 오탐도 있습니다. heredoc 본문에 `.claude/hooks` 경로나 `no-verify` 글자만 있어도 막힙니다. 이때 AI는 Write 도구로 돌아가며, 배포 시험에서 한 세션에 6번 나왔습니다. 커밋된 테스트 잠금은 셸로 우회해도 pre-commit이 막습니다.
+- **`fix/` 브랜치의 첫 커밋 전에는 기존 테스트를 고칠 수 있습니다** (훅·pre-commit 모두 "브랜치에 커밋이 하나 이상"일 때부터 잠금). 보통은 intent·spec·plan 커밋이 먼저 들어가므로 구현 시점에는 잠겨 있습니다.
+- **리뷰 단계가 모든 구멍을 잡지는 않습니다.** 배포 시험(쇼핑몰 배송비 민원)에서 `qty: 1.5` 같은 소수 수량은 spec-reviewer·`/code-review`·reviewer·verifier 모두 놓쳤습니다.
 - **pre-commit은 사람이 Claude 밖에서 `--no-verify`로 건너뛸 수 있습니다.** 서버 쪽 강제(CI·브랜치 보호)는 범위 밖입니다.
 - **Node.js·Windows만 검증했습니다.** 문법 검사는 JS만 봅니다(TypeScript 미검사). Java·Python 프로젝트는 지원하지 않습니다.
 

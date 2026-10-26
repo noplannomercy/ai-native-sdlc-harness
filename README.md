@@ -87,6 +87,7 @@ powershell -ExecutionPolicy Bypass -File C:\tools\sdlc-harness\install.ps1 -Targ
 | [USER_GUIDE.md](USER_GUIDE.md) | 개발자 — 실제 작업을 하네스로 진행하는 법, AI 질문에 답하는 법, 승인과 검증 |
 | [MAINTENANCE.md](MAINTENANCE.md) | 관리자 — 구성 요소, 스킬·규칙 추가, 업데이트, 문제 해결 |
 | [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) | 외부 스킬 4개의 출처와 라이선스 (MIT) |
+| [LICENSE](LICENSE) | 이 하네스의 라이선스 (MIT) |
 
 ## 저장소 구조
 

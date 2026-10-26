@@ -1,9 +1,29 @@
 #!/bin/sh
-# 커밋 단계의 무거운 검사: 전체 문법 + 테스트 (테스트 명령은 .claude/harness.json 의 testCommand)
+# 커밋 단계의 무거운 검사: 커밋된 테스트 잠금 + 전체 문법 + 테스트 (설정은 .claude/harness.json)
+cfg() { node -e "try{process.stdout.write(String(require('./.claude/harness.json')['$1']||''))}catch{}"; }
+
+# fix/ 브랜치에서 이미 커밋된 테스트 파일의 수정·삭제를 막는다 (guard.js 와 같은 규칙, 셸·Claude 밖 경로 포함)
+BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
+case "$BRANCH" in
+  fix/*)
+    BASE=$(cfg baseBranch); [ -z "$BASE" ] && BASE=main
+    AHEAD=$(git rev-list --count "$BASE..HEAD" 2>/dev/null || echo 0)
+    if [ "$AHEAD" -gt 0 ]; then
+      LOCKED=$(git diff --cached --name-only --diff-filter=MDR HEAD | grep -E '(^|/)test/|\.test\.js$')
+      if [ -n "$LOCKED" ]; then
+        echo "pre-commit: $BRANCH 에서 이미 커밋된 테스트를 수정·삭제할 수 없습니다:" >&2
+        echo "$LOCKED" | sed 's/^/  /' >&2
+        echo "구현 코드를 고치세요. 새 테스트는 새 파일로 추가합니다. 테스트가 틀렸다면 사람에게 알리세요." >&2
+        exit 1
+      fi
+    fi
+    ;;
+esac
+
 node .claude/hooks/check-syntax-all.js || exit 1
-TEST_CMD=$(node -e "try{process.stdout.write(String(require('./.claude/harness.json').testCommand||''))}catch{}")
+TEST_CMD=$(cfg testCommand)
 if [ -z "$TEST_CMD" ]; then
-  echo "pre-commit: .claude/harness.json 의 testCommand 가 비어 있습니다. 사람이 테스트 명령을 채운 뒤 커밋하세요 (USER_GUIDE '설치 후 설정')." >&2
+  echo "pre-commit: .claude/harness.json 의 testCommand 가 비어 있습니다. 사람이 테스트 명령을 채운 뒤 커밋하세요 (README '설치 후 설정')." >&2
   exit 1
 fi
 sh -c "$TEST_CMD" || { echo "pre-commit: 테스트 실패 ($TEST_CMD) — 코드를 고친 뒤 다시 커밋하세요." >&2; exit 1; }
