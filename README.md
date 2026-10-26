@@ -26,7 +26,7 @@ Claude Code가 **기존 Node.js 프로젝트**에서 일할 때 정해진 순서
 ## 설치
 
 ```powershell
-git clone <이 저장소 URL> C:\tools\sdlc-harness
+git clone https://github.com/noplannomercy/ai-native-sdlc-harness.git C:\tools\sdlc-harness
 powershell -ExecutionPolicy Bypass -File C:\tools\sdlc-harness\install.ps1 -Target C:\work\my-app
 ```
 
