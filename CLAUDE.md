@@ -9,7 +9,7 @@ Todo 웹앱 (AI-native SDLC 플레이북 하네스 검증용). 의존성 없는 
 
 ## 제약 사항
 - `.claude/hooks/`, `.claude/settings.json`은 수정 금지 (hook이 차단). 가드레일 변경은 사람이 한다.
-- 버그 수정은 `fix/<slug>` 브랜치에서: 실패하는 테스트를 먼저 커밋한다. 이후 커밋된 테스트는 수정할 수 없다 (hook이 차단). — 이유: 테스트를 고쳐서 통과시키는 것을 막기 위해.
+- 버그 수정은 `fix/<slug>` 브랜치에서: 테스트를 먼저 쓰고 수정 전 코드에서 실패(RED)하는 실행 결과를 `plans/<slug>.md`에 남긴 뒤, 테스트와 수정을 한 커밋에 넣는다. 커밋된 테스트는 수정할 수 없다 (hook이 차단). — 이유: 테스트를 고쳐서 통과시키는 것을 막기 위해. 테스트만 먼저 커밋하지 않는다 — pre-commit이 실패 테스트 커밋을 막는다(flight-01·02에서 두 번 충돌).
 - npm 의존성 추가 금지. Node 내장 모듈만 사용한다. — 이유: 하네스 검증 속도와 재현성.
 - `--no-verify` 커밋 금지. pre-commit의 `npm test` 실패는 코드를 고쳐서 해결한다.
 
@@ -38,7 +38,7 @@ Todo 웹앱 (AI-native SDLC 플레이북 하네스 검증용). 의존성 없는 
 | `public/` | 프론트엔드 |
 | `test/` | `*.test.js` |
 | `REVIEW.md` | 리뷰 기준 (`reviewer` 에이전트가 사용) |
-| `.claude/` | skills(intent, spec, grilling, change-impact, diagnosing-bugs, click-path-audit) · agents(verifier, reviewer) · hooks |
+| `.claude/` | skills(intent, spec, grilling, change-impact, diagnosing-bugs, click-path-audit) · agents(verifier, reviewer, spec-reviewer) · hooks |
 
 ## 하네스 진화 원칙
 - 규칙은 반복 실패(2회 이상)가 관찰될 때만 추가한다. 1회 관찰로 설계하지 않는다.
