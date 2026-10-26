@@ -19,6 +19,7 @@ Todo 웹앱 (AI-native SDLC 플레이북 하네스 검증용). 의존성 없는 
 3. 완료 보고 전 `verifier` 에이전트로 검증하고, 결과를 그대로 보고한다.
 4. 사용자에게 하는 모든 응답과 커밋 메시지는 한국어로 쓴다.
 5. 같은 실수를 두 번 하면 이 파일 "제약 사항"에 이유와 함께 추가를 제안한다.
+6. 단계별 스킬을 호출한다: spec 작성 전 `grilling`(결정 사항 심문) · spec 승인 직후와 구현 후 `change-impact`(영향 분석·diff 대조) · 민원·버그 원인 분석 `diagnosing-bugs` · 화면·상태 흐름 점검 `click-path-audit` · 커밋 전 `/code-review`.
 
 ## 스택
 | 항목 | 값 |
@@ -37,7 +38,7 @@ Todo 웹앱 (AI-native SDLC 플레이북 하네스 검증용). 의존성 없는 
 | `public/` | 프론트엔드 |
 | `test/` | `*.test.js` |
 | `REVIEW.md` | 리뷰 기준 (`reviewer` 에이전트가 사용) |
-| `.claude/` | skills(intent, spec) · agents(verifier, reviewer) · hooks |
+| `.claude/` | skills(intent, spec, grilling, change-impact, diagnosing-bugs, click-path-audit) · agents(verifier, reviewer) · hooks |
 
 ## 하네스 진화 원칙
 - 규칙은 반복 실패(2회 이상)가 관찰될 때만 추가한다. 1회 관찰로 설계하지 않는다.
