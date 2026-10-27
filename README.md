@@ -1,9 +1,9 @@
-# AI-native SDLC Harness v1.0.1
+# AI-native SDLC Harness v1.0.2
 
 Claude Code가 **기존 프로젝트**에서 일할 때 정해진 순서(intent → spec → plan → 구현 → 검증)를 따르게 하는 하네스입니다. 프로젝트에 설치하는 파일 묶음(`kit/`)과 설치 스크립트로 되어 있습니다.
 
 - **누구를 위한 것인가:** AI 코딩 도구에 익숙하지 않은 개발자가 레거시 유지보수·기능 추가를 할 때. AI가 요구사항을 마음대로 정하지 않고 사람에게 묻고, 테스트를 고쳐서 통과시키지 못하게 합니다.
-- **지원 범위 (v1.0.1):** 아래 셋은 서로 다른 이야기입니다.
+- **지원 범위 (v1.0.2):** 아래 셋은 서로 다른 이야기입니다.
   - **설치:** Claude Code + Windows의 git 저장소면 프로젝트 언어와 상관없이 설치됩니다.
   - **실행:** 빌드·테스트·기동 명령은 `.claude/harness.json`에 사람이 적은 대로 실행합니다. `package.json`이 있으면 `npm` 명령을 미리 채웁니다.
   - **검증 완료:** 하네스 전체 흐름을 검증한 것은 Node.js 프로젝트뿐입니다. Java 등 다른 스택은 설치만 확인했고, 다른 OS는 검증하지 않았습니다. 한계는 [MAINTENANCE.md](MAINTENANCE.md) "알려진 한계"를 보세요.
@@ -16,7 +16,7 @@ Claude Code가 **기존 프로젝트**에서 일할 때 정해진 순서(intent 
 | 스킬 6개 | `intent`·`spec`(체인 작성) · `grilling`(결정 사항 심문) · `change-impact`(영향 분석) · `diagnosing-bugs`(버그 원인) · `click-path-audit`(화면·상태 흐름) |
 | 에이전트 3개 | `spec-reviewer`(spec을 작성 대화와 분리해 사례로 검토) · `reviewer`(diff 리뷰) · `verifier`(완료 전 검증) |
 | Claude Code 훅 | 가드레일 파일 편집 차단 · `fix/` 브랜치에서 커밋된 테스트 편집 차단 · 편집한 JS 문법 검사 |
-| git pre-commit | 전체 JS 문법 검사 + 테스트 통과 전 커밋 차단 |
+| git pre-commit | 이번 작업에서 바뀐 JS 문법 검사 + 테스트 통과 전 커밋 차단 |
 | 설정 `.claude/harness.json` | 프로젝트별 테스트 명령·기동 확인 주소. 비어 있으면 검증을 PASS로 보고하지 않는다 |
 
 ## 필요한 것

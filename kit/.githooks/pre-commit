@@ -1,5 +1,5 @@
 #!/bin/sh
-# 커밋 단계의 무거운 검사: 커밋된 테스트 잠금 + 전체 문법 + 테스트 (설정은 .claude/harness.json)
+# 커밋 단계의 무거운 검사: 커밋된 테스트 잠금 + 바뀐 JS 문법 + 테스트 (설정은 .claude/harness.json)
 cfg() { node -e "try{process.stdout.write(String(require('./.claude/harness.json')['$1']||''))}catch{}"; }
 
 # fix/ 브랜치에서 이미 커밋된 테스트 파일의 수정·삭제를 막는다 (guard.js 와 같은 규칙, 셸·Claude 밖 경로 포함)

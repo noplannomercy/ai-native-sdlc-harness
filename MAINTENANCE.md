@@ -18,7 +18,7 @@
 | `.claude/settings.json` | 권한(allow·deny: push·npm install 차단)과 훅 연결 | Claude Code |
 | `.claude/hooks/guard.js` | PreToolUse: 보호 경로 편집 차단, `fix/` 브랜치에서 커밋된 테스트 편집 차단, `--no-verify` 차단 | Claude Code |
 | `.claude/hooks/check-syntax.js` | PostToolUse: 편집한 JS 파일 문법 검사 | Claude Code |
-| `.claude/hooks/check-syntax-all.js` | git이 아는 모든 `.js/.mjs/.cjs` 문법 검사 (pre-commit·verifier가 호출) | — |
+| `.claude/hooks/check-syntax-all.js` | 이번 작업에서 바뀐 `.js/.mjs/.cjs` 문법 검사: 기준 브랜치 이후 커밋·스테이징·작업 트리·새 파일. 손대지 않은 파일은 보지 않는다 (pre-commit·verifier가 호출) | — |
 | `.claude/hooks/lib.js` | 훅 공통 함수, `harness.json` 읽기 | — |
 | `.claude/harness.json` | 프로젝트별 `baseBranch`·`testCommand`·`smoke`. 설치 스크립트가 만든다 (kit에 없음) | 보호 경로 |
 | `.githooks/pre-commit` | `fix/` 브랜치에서 커밋된 테스트 수정·삭제 차단(셸 경로 포함) + 문법 검사 + `testCommand`. 비어 있으면 커밋 차단 | git 훅 |
@@ -96,18 +96,18 @@ v1에는 자동 업그레이드가 없습니다. 설치 스크립트는 내용�
 | Claude 실행 중 창을 만지면 창이 꺼진다 (Windows 10 1809·Server 2019 계열) | 오래된 기본 콘솔(conhost) 문제. VS Code 터미널이나 Windows Terminal에서 실행. 꺼졌으면 같은 폴더에서 `claude --continue` |
 | 전역 Claude 설정(플러그인·전역 CLAUDE.md) 때문에 동작이 다르다 | `tools/clean-session.cmd`를 프로젝트에 복사해 실행하면 `%USERPROFILE%\.claude-clean`을 설정 폴더로 써서 하네스만으로 돌려 볼 수 있습니다 (처음 한 번 로그인 필요) |
 
-## 알려진 한계 (v1.0.1)
+## 알려진 한계 (v1.0.2)
 
 - **모델 의존 단계는 건너뛸 수 있습니다.** 스킬 호출, `spec-reviewer`, `verifier`는 AI가 CLAUDE.md를 따를 때만 동작합니다. 완료 보고 전에 verifier를 강제하는 훅은 없습니다.
 - **열린 결정이 남은 채 머지되는 것은 막지 않습니다.** 완료 보고의 "확인이 필요한 사항"은 사람이 읽어야 합니다.
 - **`grilling`의 추천안은 위험할 수 있습니다.** 시험에서 두 번 연속 구멍이 있는 추천안을 냈습니다. `spec-reviewer`가 뒤에서 잡지만, 사람이 일괄 수락하지 않는 것이 먼저입니다 (USER_GUIDE 2단계).
-- **셸 명령을 통한 보호 파일 수정 차단은 패턴 검사입니다.** `node -e`로 파일을 쓰는 식의 우회는 막지 못합니다(Edit·Write 도구 경로는 확실히 막습니다). 반대로 오탐도 있습니다. heredoc 본문에 `.claude/hooks` 경로나 `no-verify` 글자만 있어도 막힙니다. 이때 AI는 Write 도구로 돌아가며, 배포 시험에서 한 세션에 6번 나왔습니다. 커밋된 테스트 잠금은 셸로 우회해도 pre-commit이 막습니다.
+- **셸 명령을 통한 보호 파일 수정 차단은 패턴 검사입니다.** 명령을 단계(`;` `&&` `||` `|` 줄바꿈)로 나눠, 같은 단계에서 보호 경로로 리다이렉트하거나, 쓰기 명령(`rm`·`mv`·`sed -i`·`tee`·`Set-Content`·`Out-File`·`Remove-Item`)이 보호 경로를 다루거나, `cp`의 대상이 보호 경로일 때만 막습니다. 보호 파일 읽기(`cat`·`grep`·`sed -n`)와 다른 곳으로의 리다이렉트(`2>/dev/null`)는 통과합니다. `node -e`로 파일을 쓰는 식의 우회는 막지 못합니다(Edit·Write 도구 경로는 확실히 막습니다). 오탐도 남아 있습니다. 한 단계 안에 쓰기 명령 단어와 보호 경로가 함께 있으면 막히고(예: `grep "rm" .claude/hooks/guard.js`), `no-verify` 글자는 어디에 있든 막힙니다. 커밋된 테스트 잠금은 셸로 우회해도 pre-commit이 막습니다.
 - **`fix/` 브랜치의 첫 커밋 전에는 기존 테스트를 고칠 수 있습니다** (훅·pre-commit 모두 "브랜치에 커밋이 하나 이상"일 때부터 잠금). 보통은 intent·spec·plan 커밋이 먼저 들어가므로 구현 시점에는 잠겨 있습니다.
 - **리뷰 단계가 모든 구멍을 잡지는 않습니다.** 배포 시험(쇼핑몰 배송비 민원)에서 `qty: 1.5` 같은 소수 수량은 spec-reviewer·`/code-review`·reviewer·verifier 모두 놓쳤습니다.
 - **pre-commit은 사람이 Claude 밖에서 `--no-verify`로 건너뛸 수 있습니다.** 서버 쪽 강제(CI·브랜치 보호)는 범위 밖입니다.
-- **설치와 지원 보장은 다릅니다.** v1.0.1부터 설치는 프로젝트 언어를 따지지 않습니다. 하지만 하네스 전체 흐름을 검증한 것은 Node.js·Windows뿐입니다. Java 프로젝트(litemall)는 설치·재실행·충돌 중단까지만 확인했습니다. 다른 스택에서는 `harness.json`의 `testCommand` 등을 사람이 채워야 하고, settings 허용 목록에 `npm`만 있어서 `mvn` 같은 명령은 매번 승인을 묻습니다.
+- **설치와 지원 보장은 다릅니다.** v1.0.1부터 설치는 프로젝트 언어를 따지지 않습니다. 하지만 하네스 전체 흐름을 검증한 것은 Node.js·Windows뿐입니다. Java 프로젝트(litemall)는 설치·재실행·충돌 중단, 커밋 게이트(`testCommand`가 비면 차단, 지정한 명령의 성공·실패에 따라 통과·차단), 셸 읽기 명령 통과·쓰기 차단까지 확인했습니다. 실제 `mvn test`는 검증 PC에 Maven이 없어 돌려 보지 않았습니다. 명령이 없으면(`mvn: command not found`) 커밋은 막히지만 안내 문구는 "테스트 실패"로 나옵니다. 다른 스택에서는 `harness.json`의 `testCommand` 등을 사람이 채워야 하고, settings 허용 목록에 `npm`만 있어서 `mvn` 같은 명령은 매번 승인을 묻습니다.
 - **문법 검사는 JS만 봅니다.** TypeScript는 검사하지 않고, Java 등은 검사 대상이 아닙니다. 다른 언어의 컴파일 오류는 `testCommand`가 잡아야 합니다.
-- **저장소에 Node로 읽을 수 없는 JS가 있으면 커밋이 막힙니다.** pre-commit은 git이 아는 모든 `.js`를 `node --check`로 검사하고, 제외 설정이 없습니다. 예를 들어 litemall은 위챗 미니앱용 외부 라이브러리 `renard-wx/lib/wxParse/showdown.js` 때문에 설치 직후 첫 커밋부터 실패합니다. Node 프로젝트에 외부 JS를 넣어 둔 경우에도 같습니다.
+- **문법 검사는 이번 작업에서 바뀐 JS만 봅니다.** 손대지 않은 JS는 검사하지 않으므로, 저장소에 원래 있던 외부 라이브러리가 커밋을 막지 않습니다(v1.0.1까지는 저장소 전체를 검사해서 litemall의 미니앱 라이브러리 `renard-wx/lib/wxParse/showdown.js` 때문에 첫 커밋부터 막혔습니다). 반대로 바꾼 파일이 Node가 읽을 수 없는 JS(브라우저·미니앱 전용 문법)면 막힙니다. 기준 브랜치 자체에서 `--no-verify`로 들어간 깨진 JS는 다음 커밋에서 다시 잡지 않습니다.
 
 ## 배포 전 검증 (kit을 고친 뒤)
 
@@ -115,6 +115,8 @@ v1에는 자동 업그레이드가 없습니다. 설치 스크립트는 내용�
 2. 같은 폴더에 다시 실행 → "새로 만듦 0".
 2-1. `package.json`이 없는 저장소(예: Java 프로젝트)에서 실행 → 설치되고, 기존 파일 변경 0건, `testCommand`는 빈 값.
 3. `CLAUDE.md`가 이미 있는 저장소, `core.hooksPath=.husky`인 저장소에서 실행 → 충돌로 중단되고 파일이 그대로인지.
-4. `testCommand`를 비우고 커밋 → 차단. 실패 테스트를 넣고 커밋 → 차단.
+4. `testCommand`를 비우고 커밋 → 차단. 실패 테스트를 넣고 커밋 → 차단. 문법 오류 JS를 스테이징하거나 새 파일로 두고 커밋 → 차단.
+4-1. Java 저장소(litemall 스냅숏)에 설치 → 설치 커밋이 외부 JS 때문에 막히지 않는지, `testCommand` 지정 시 명령 성공·실패에 따라 통과·차단되는지.
+4-2. 가드 훅에 셸 명령을 넣어 본다: 보호 파일 읽기(`cat .claude/harness.json 2>/dev/null` 등)는 통과, 보호 경로 쓰기(`> .claude/harness.json`, `rm .claude/hooks/...`, `tee`, `Set-Content` 등)는 차단.
 5. 설치한 폴더에서 `claude -p "<요청>" --output-format stream-json --verbose`를 실행해 init 이벤트의 `skills`·`agents`에 6개·3개가 있는지, `.claude/hooks/guard.js` 편집 요청이 훅에 막히는지.
 6. 짧은 과제 하나를 intent부터 verifier까지 돌립니다.

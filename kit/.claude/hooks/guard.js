@@ -3,7 +3,21 @@ import { readInput, rel, git, block, config } from './lib.js';
 
 const PROTECTED = [/^\.claude\/hooks\//, /^\.claude\/settings(\.local)?\.json$/, /^\.claude\/harness\.json$/, /^\.githooks\//];
 const IS_TEST = /(^|\/)test\/|\.test\.js$/;
-const WRITE_OPS = /(>|\brm\b|\bmv\b|\bcp\b|sed\s+-i|\btee\b|Set-Content|Out-File|Remove-Item)/;
+const PROTECTED_SH = /\.claude[\/\\](hooks|settings|harness\.json)|\.githooks/;
+const WRITE_CMD = /(\brm\b|\bmv\b|sed\s+-i|\btee\b|Set-Content|Out-File|Remove-Item)/;
+
+// 보호 경로를 바꾸는 명령인가. 명령을 단계(; && || | 줄바꿈)로 나눠, 같은 단계에서
+// 리다이렉트 대상이 보호 경로이거나, 쓰기 명령이 보호 경로를 다루거나, cp의 대상이 보호 경로일 때만 참.
+// 보호 파일 읽기(cat, grep, sed -n)와 다른 곳으로의 리다이렉트(2>/dev/null, 2>&1)는 통과.
+function writesProtected(cmd) {
+  return cmd.split(/&&|\|\||[;|\n]/).some((seg) => {
+    if (!PROTECTED_SH.test(seg)) return false;
+    for (const m of seg.matchAll(/>>?\s*["']?([^\s"'&]+)/g)) if (PROTECTED_SH.test(m[1])) return true;
+    if (WRITE_CMD.test(seg)) return true;
+    const words = seg.trim().split(/\s+/);
+    return /\bcp\b/.test(seg) && PROTECTED_SH.test(words[words.length - 1]);
+  });
+}
 
 const input = await readInput();
 const { tool_name: tool, tool_input: ti = {} } = input;
@@ -11,7 +25,7 @@ const { tool_name: tool, tool_input: ti = {} } = input;
 if (tool === 'Bash' || tool === 'PowerShell') {
   const cmd = ti.command || '';
   if (/--no-verify/.test(cmd)) block('차단: --no-verify 금지. pre-commit 실패는 코드를 고쳐서 해결하세요.');
-  if (/\.claude[\/\\](hooks|settings|harness\.json)|\.githooks/.test(cmd) && WRITE_OPS.test(cmd)) {
+  if (writesProtected(cmd)) {
     block('차단: 가드레일 파일(.claude/hooks, settings, harness.json, .githooks)은 셸로도 수정할 수 없습니다. 변경이 필요하면 사람에게 요청하세요.');
   }
   process.exit(0);
