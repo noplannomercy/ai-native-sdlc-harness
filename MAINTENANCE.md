@@ -96,7 +96,7 @@ v1에는 자동 업그레이드가 없습니다. 설치 스크립트는 내용�
 | Claude 실행 중 창을 만지면 창이 꺼진다 (Windows 10 1809·Server 2019 계열) | 오래된 기본 콘솔(conhost) 문제. VS Code 터미널이나 Windows Terminal에서 실행. 꺼졌으면 같은 폴더에서 `claude --continue` |
 | 전역 Claude 설정(플러그인·전역 CLAUDE.md) 때문에 동작이 다르다 | `tools/clean-session.cmd`를 프로젝트에 복사해 실행하면 `%USERPROFILE%\.claude-clean`을 설정 폴더로 써서 하네스만으로 돌려 볼 수 있습니다 (처음 한 번 로그인 필요) |
 
-## 알려진 한계 (v1.0)
+## 알려진 한계 (v1.0.1)
 
 - **모델 의존 단계는 건너뛸 수 있습니다.** 스킬 호출, `spec-reviewer`, `verifier`는 AI가 CLAUDE.md를 따를 때만 동작합니다. 완료 보고 전에 verifier를 강제하는 훅은 없습니다.
 - **열린 결정이 남은 채 머지되는 것은 막지 않습니다.** 완료 보고의 "확인이 필요한 사항"은 사람이 읽어야 합니다.
@@ -105,12 +105,15 @@ v1에는 자동 업그레이드가 없습니다. 설치 스크립트는 내용�
 - **`fix/` 브랜치의 첫 커밋 전에는 기존 테스트를 고칠 수 있습니다** (훅·pre-commit 모두 "브랜치에 커밋이 하나 이상"일 때부터 잠금). 보통은 intent·spec·plan 커밋이 먼저 들어가므로 구현 시점에는 잠겨 있습니다.
 - **리뷰 단계가 모든 구멍을 잡지는 않습니다.** 배포 시험(쇼핑몰 배송비 민원)에서 `qty: 1.5` 같은 소수 수량은 spec-reviewer·`/code-review`·reviewer·verifier 모두 놓쳤습니다.
 - **pre-commit은 사람이 Claude 밖에서 `--no-verify`로 건너뛸 수 있습니다.** 서버 쪽 강제(CI·브랜치 보호)는 범위 밖입니다.
-- **Node.js·Windows만 검증했습니다.** 문법 검사는 JS만 봅니다(TypeScript 미검사). Java·Python 프로젝트는 지원하지 않습니다.
+- **설치와 지원 보장은 다릅니다.** v1.0.1부터 설치는 프로젝트 언어를 따지지 않습니다. 하지만 하네스 전체 흐름을 검증한 것은 Node.js·Windows뿐입니다. Java 프로젝트(litemall)는 설치·재실행·충돌 중단까지만 확인했습니다. 다른 스택에서는 `harness.json`의 `testCommand` 등을 사람이 채워야 하고, settings 허용 목록에 `npm`만 있어서 `mvn` 같은 명령은 매번 승인을 묻습니다.
+- **문법 검사는 JS만 봅니다.** TypeScript는 검사하지 않고, Java 등은 검사 대상이 아닙니다. 다른 언어의 컴파일 오류는 `testCommand`가 잡아야 합니다.
+- **저장소에 Node로 읽을 수 없는 JS가 있으면 커밋이 막힙니다.** pre-commit은 git이 아는 모든 `.js`를 `node --check`로 검사하고, 제외 설정이 없습니다. 예를 들어 litemall은 위챗 미니앱용 외부 라이브러리 `renard-wx/lib/wxParse/showdown.js` 때문에 설치 직후 첫 커밋부터 실패합니다. Node 프로젝트에 외부 JS를 넣어 둔 경우에도 같습니다.
 
 ## 배포 전 검증 (kit을 고친 뒤)
 
 1. `example/todo-app`을 새 폴더에 복사 → `git init` → 커밋 → `install.ps1` → 출력 확인.
 2. 같은 폴더에 다시 실행 → "새로 만듦 0".
+2-1. `package.json`이 없는 저장소(예: Java 프로젝트)에서 실행 → 설치되고, 기존 파일 변경 0건, `testCommand`는 빈 값.
 3. `CLAUDE.md`가 이미 있는 저장소, `core.hooksPath=.husky`인 저장소에서 실행 → 충돌로 중단되고 파일이 그대로인지.
 4. `testCommand`를 비우고 커밋 → 차단. 실패 테스트를 넣고 커밋 → 차단.
 5. 설치한 폴더에서 `claude -p "<요청>" --output-format stream-json --verbose`를 실행해 init 이벤트의 `skills`·`agents`에 6개·3개가 있는지, `.claude/hooks/guard.js` 편집 요청이 훅에 막히는지.

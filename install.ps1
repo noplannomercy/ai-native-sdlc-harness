@@ -1,6 +1,6 @@
 ﻿<#
 .SYNOPSIS
-  AI-native SDLC 하네스를 기존 Node.js 프로젝트(git 저장소)에 설치한다.
+  AI-native SDLC 하네스를 기존 프로젝트(git 저장소)에 설치한다. 프로젝트 언어는 따지지 않는다 (검증 완료는 Node.js 뿐).
 
 .DESCRIPTION
   kit/ 의 파일을 대상 저장소에 복사하고, .claude/harness.json 을 만들고, git 훅 경로를 .githooks 로 켠다.
@@ -62,11 +62,8 @@ if ([System.IO.Path]::GetFullPath($top.Out).TrimEnd('\') -ne $Target) {
 }
 if ($Target -eq (Split-Path $KitDir -Parent)) { Stop-Install "하네스 배포 저장소 자체에는 설치하지 않습니다." }
 
-$pkgPath = Join-Path $Target 'package.json'
+$pkgPath = Join-Path $Target 'package.json'   # 있으면 harness.json 을 npm 명령으로 미리 채운다 (없어도 설치한다)
 $conflicts = New-Object System.Collections.Generic.List[string]
-if (-not (Test-Path -LiteralPath $pkgPath)) {
-  $conflicts.Add("package.json 없음 — v1 은 Node.js 프로젝트 전용입니다. Node 프로젝트라면 'npm init -y' 후 다시 실행하세요.")
-}
 
 # ── 1. 사전 점검 (여기까지는 아무것도 바꾸지 않는다) ─────────────
 $plan = New-Object System.Collections.Generic.List[object]
@@ -143,10 +140,12 @@ try {
       else { $cur = (Invoke-Git symbolic-ref --short HEAD).Out; if ($cur) { $base = $cur } }
     }
     $testCmd = ''; $startCmd = ''
-    $pkg = [System.IO.File]::ReadAllText($pkgPath) | ConvertFrom-Json
-    if ($pkg.scripts) {
-      if ($pkg.scripts.test -and $pkg.scripts.test -notmatch 'no test specified') { $testCmd = 'npm test' }
-      if ($pkg.scripts.start) { $startCmd = 'npm start' }
+    if (Test-Path -LiteralPath $pkgPath) {
+      $pkg = [System.IO.File]::ReadAllText($pkgPath) | ConvertFrom-Json
+      if ($pkg.scripts) {
+        if ($pkg.scripts.test -and $pkg.scripts.test -notmatch 'no test specified') { $testCmd = 'npm test' }
+        if ($pkg.scripts.start) { $startCmd = 'npm start' }
+      }
     }
     $cfg = [ordered]@{ baseBranch = $base; testCommand = $testCmd; smoke = [ordered]@{ start = $startCmd; url = '' } }
     [System.IO.File]::WriteAllText($cfgPath, (($cfg | ConvertTo-Json -Depth 3) + "`n"), $Utf8)
@@ -184,9 +183,9 @@ Write-Host "  새로 만듦 $($done.Count) · 이미 같음 $same · 유지 $($k
 try { $cfg = [System.IO.File]::ReadAllText($cfgPath) | ConvertFrom-Json }
 catch { Stop-Install ".claude\harness.json 이 올바른 JSON 이 아닙니다. 고친 뒤 다시 실행하세요." }
 $missing = New-Object System.Collections.Generic.List[string]
-if (-not $cfg.testCommand) { $missing.Add('testCommand — 테스트 명령 (예: npm test). 비어 있으면 커밋이 막힙니다') }
+if (-not $cfg.testCommand) { $missing.Add('testCommand — 테스트 명령 (예: npm test, mvn test). 비어 있으면 커밋이 막힙니다') }
 if ($cfg.smoke -ne $false) {
-  if (-not $cfg.smoke.start) { $missing.Add('smoke.start — 앱 기동 명령 (예: npm start). 서버가 없는 프로젝트면 smoke 를 false 로') }
+  if (-not $cfg.smoke.start) { $missing.Add('smoke.start — 앱 기동 명령 (예: npm start, mvn spring-boot:run). 서버가 없는 프로젝트면 smoke 를 false 로') }
   if (-not $cfg.smoke.url) { $missing.Add('smoke.url — 기동 확인 주소 (예: http://localhost:3000/)') }
 }
 $claudeMd = Join-Path $Target 'CLAUDE.md'

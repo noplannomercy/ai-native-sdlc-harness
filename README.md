@@ -1,9 +1,12 @@
-# AI-native SDLC Harness v1.0
+# AI-native SDLC Harness v1.0.1
 
-Claude Code가 **기존 Node.js 프로젝트**에서 일할 때 정해진 순서(intent → spec → plan → 구현 → 검증)를 따르게 하는 하네스입니다. 프로젝트에 설치하는 파일 묶음(`kit/`)과 설치 스크립트로 되어 있습니다.
+Claude Code가 **기존 프로젝트**에서 일할 때 정해진 순서(intent → spec → plan → 구현 → 검증)를 따르게 하는 하네스입니다. 프로젝트에 설치하는 파일 묶음(`kit/`)과 설치 스크립트로 되어 있습니다.
 
 - **누구를 위한 것인가:** AI 코딩 도구에 익숙하지 않은 개발자가 레거시 유지보수·기능 추가를 할 때. AI가 요구사항을 마음대로 정하지 않고 사람에게 묻고, 테스트를 고쳐서 통과시키지 못하게 합니다.
-- **지원 범위 (v1.0):** Claude Code + Windows + Node.js 프로젝트(git 저장소). Java·Python 등 다른 스택과 다른 OS는 검증하지 않았습니다.
+- **지원 범위 (v1.0.1):** 아래 셋은 서로 다른 이야기입니다.
+  - **설치:** Claude Code + Windows의 git 저장소면 프로젝트 언어와 상관없이 설치됩니다.
+  - **실행:** 빌드·테스트·기동 명령은 `.claude/harness.json`에 사람이 적은 대로 실행합니다. `package.json`이 있으면 `npm` 명령을 미리 채웁니다.
+  - **검증 완료:** 하네스 전체 흐름을 검증한 것은 Node.js 프로젝트뿐입니다. Java 등 다른 스택은 설치만 확인했고, 다른 OS는 검증하지 않았습니다. 한계는 [MAINTENANCE.md](MAINTENANCE.md) "알려진 한계"를 보세요.
 
 ## 무엇이 들어 있나
 
@@ -21,7 +24,7 @@ Claude Code가 **기존 Node.js 프로젝트**에서 일할 때 정해진 순서
 - Windows 10/11, PowerShell 5.1 이상
 - [Claude Code](https://docs.claude.com/en/docs/claude-code) 2.1 이상 (검증: 2.1.310)
 - Git for Windows (검증: 2.53) — pre-commit을 Git의 `sh`로 실행합니다
-- Node.js 20 이상 (검증: 24.14)
+- Node.js 20 이상 (검증: 24.14). 하네스 훅을 실행하는 데 필요합니다. 프로젝트 언어와는 상관없습니다
 
 ## 설치
 
@@ -33,7 +36,7 @@ powershell -ExecutionPolicy Bypass -File C:\tools\sdlc-harness\install.ps1 -Targ
 `-Target`은 설치할 프로젝트의 **git 저장소 최상위 폴더**입니다. 설치 스크립트가 하는 일은 네 가지뿐입니다.
 
 1. `kit/`의 파일을 프로젝트에 복사합니다 (`.claude/`, `.githooks/`, `templates/`, `CLAUDE.md`, `REVIEW.md`).
-2. `.claude/harness.json`을 만듭니다. `package.json`에 `test`·`start` 스크립트가 있으면 `npm test`·`npm start`로 미리 채웁니다.
+2. `.claude/harness.json`을 만듭니다. `package.json`에 `test`·`start` 스크립트가 있으면 `npm test`·`npm start`로 미리 채우고, 없으면 비워 둡니다.
 3. `intent/` `specs/` `plans/` 폴더가 없으면 만듭니다.
 4. `git config core.hooksPath .githooks`로 pre-commit을 켭니다.
 
@@ -75,7 +78,6 @@ powershell -ExecutionPolicy Bypass -File C:\tools\sdlc-harness\install.ps1 -Targ
 | `.claude\settings.json — 이미 있고 내용이 다릅니다` | 기존 설정을 옮겨 두고 설치한 뒤, 필요한 항목을 `.claude/settings.local.json`(개인용)에 다시 넣습니다 |
 | `core.hooksPath=... 가 이미 설정돼 있습니다` (husky 등) | 기존 훅 도구와 함께 쓰려면 사람이 훅을 합쳐야 합니다. v1은 자동으로 합치지 않습니다 |
 | `기존 git 훅이 있습니다` | `.git/hooks/`의 훅을 `.githooks/`로 옮겨 합치거나 지운 뒤 다시 실행합니다 |
-| `package.json 없음` | v1은 Node.js 프로젝트 전용입니다 |
 | `설치 실패 … 부분 설치 상태입니다` | 출력된 원인(권한·같은 이름의 파일 등)을 해결하고 다시 실행하면 남은 것만 설치합니다 |
 
 다시 실행해도 안전합니다. 이미 같은 파일은 건너뛰고, 사람이 고친 `CLAUDE.md`·`REVIEW.md`·`harness.json`은 유지합니다.
